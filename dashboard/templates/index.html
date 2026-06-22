@@ -88,57 +88,81 @@
     /* ── Device cards ── */
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
       gap: 12px;
     }
     .card {
-      border: 1px solid #1e1e1e;
-      border-radius: 8px;
-      padding: 14px 16px;
-      background: #111;
+      border: 1px solid #151520;
+      border-radius: 4px;
+      padding: 13px 14px;
+      background: #090910;
       transition: box-shadow 0.3s, border-color 0.3s;
       position: relative;
       overflow: hidden;
     }
-    .card:hover { border-color: #333; }
-    .card.online  {
-      border-color: #00ff4122;
-      box-shadow: 0 0 12px #00ff4115;
+    .card::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 10%; right: 10%;
+      height: 1px;
+      opacity: 0;
+      transition: opacity 0.3s;
     }
-    .card.offline { border-color: #ff444422; opacity: 0.7; }
-    .card.stale   { border-color: #ffaa0022; }
+    .card:hover { border-color: #252535; }
+    .card.online  { border-color: #00ff4128; box-shadow: 0 0 18px #00ff4110, inset 0 0 24px #00ff4106; }
+    .card.online::after  { background: linear-gradient(90deg, transparent, #00ff41, transparent); opacity: 0.5; }
+    .card.offline { border-color: #ff444420; opacity: 0.75; }
+    .card.offline::after { background: linear-gradient(90deg, transparent, #ff4444, transparent); opacity: 0.2; }
+    .card.stale   { border-color: #ffaa0025; }
+    .card.stale::after   { background: linear-gradient(90deg, transparent, #ffaa00, transparent); opacity: 0.3; }
 
     .card.flash-on  { animation: flash-green 0.6s ease; }
     .card.flash-off { animation: flash-red 0.6s ease; }
     @keyframes flash-green {
-      0% { background: #00ff4133; }
-      100% { background: #111; }
+      0%   { background: #00ff4133; }
+      100% { background: #090910; }
     }
     @keyframes flash-red {
-      0% { background: #ff444433; }
-      100% { background: #111; }
+      0%   { background: #ff444433; }
+      100% { background: #090910; }
     }
 
-    .card-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .status-dot {
-      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-    }
-    .status-dot.online  { background: #00ff41; box-shadow: 0 0 6px #00ff41; }
+    /* Card header: icon + name + status */
+    .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .card-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .card-name-block { flex: 1; min-width: 0; }
+    .card-name { font-size: 0.88rem; color: #dde; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-status-line { display: flex; align-items: center; gap: 6px; }
+
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.online  { background: #00ff41; box-shadow: 0 0 5px #00ff41; }
     .status-dot.offline { background: #ff4444; }
     .status-dot.stale   { background: #ffaa00; }
-    .status-label { font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; }
+    .status-label { font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase; }
     .status-label.online  { color: #00ff41; }
     .status-label.offline { color: #ff4444; }
     .status-label.stale   { color: #ffaa00; }
 
-    .card-name { font-size: 0.95rem; color: #fff; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .card-detail { font-size: 0.75rem; color: #666; margin-bottom: 3px; }
-    .card-detail span { color: #aaa; }
+    /* Network path mini-diagram */
+    .card-path {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 1px;
+      background: #04040a;
+      border: 1px solid #111118;
+      border-radius: 3px;
+      padding: 5px 8px;
+      margin-bottom: 10px;
+      overflow-x: auto;
+    }
+    .path-node { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+    .path-label { font-size: 7px; font-family: monospace; letter-spacing: 0.5px; color: #1e3e1e; }
+    .path-arrow { font-size: 9px; color: #1a3a1a; flex-shrink: 0; padding: 0 2px; padding-bottom: 10px; }
+
+    /* Card detail rows */
+    .card-detail { font-size: 0.72rem; color: #445; margin-bottom: 3px; font-family: monospace; letter-spacing: 0.3px; }
+    .card-detail span { color: #667; }
 
     .last-scan { text-align: right; margin-top: 16px; font-size: 0.7rem; color: #444; letter-spacing: 1px; }
   </style>
@@ -448,6 +472,124 @@
     }
   }
 
+  // ── Card icon + path helpers ──────────────────────────────────────────────
+
+  function getDeviceType(name) {
+    const n = (name || "").toLowerCase();
+    if (n.includes("router") || n.includes("archer")) return "router";
+    if (n.includes(" ap") || n.includes("re305") || n.includes("wa850re")) return "ap";
+    if (n.includes("switch")) return "switch";
+    if (n.includes("laptop") || n.includes("macbook")) return "laptop";
+    if (n.includes("server")) return "server";
+    if (n.includes("tv")) return "tv";
+    if (n.includes("iphone") || n.includes("motorola") || n.includes("phone")) return "phone";
+    return "unknown";
+  }
+
+  const DEVICE_PATHS = {
+    "0.1":   ["ont","router"],
+    "0.2":   ["ont","router","switch","ap"],
+    "0.3":   ["ont","router","splitter","ap"],
+    "0.10":  ["ont","router","switch","server"],
+    "0.100": ["ont","router","switch","laptop"],
+    "0.124": ["ont","router","switch","laptop"],
+    "0.129": ["ont","router","laptop"],
+    "0.148": ["ont","router","switch","laptop"],
+    "0.154": ["ont","router","tv"],
+    "0.209": ["ont","router","phone"],
+    "0.121": ["ont","router","phone"],
+    "0.243": ["ont","router","switch"],
+  };
+
+  const PATH_LABELS = {
+    ont:"ONT", router:"RTR", switch:"SW", splitter:"SPLT",
+    ap:"AP", laptop:"LAPT", server:"SRV", tv:"TV", phone:"PHN", unknown:"?",
+  };
+
+  function iconInnerStr(type, sc, fc) {
+    const ss = `stroke="${sc}" fill="${fc}" stroke-width="1.2" stroke-linecap="round"`;
+    const sl = `stroke="${sc}" fill="none" stroke-width="1.2" stroke-linecap="round"`;
+    const sf = `stroke="${sc}" fill="${sc}" stroke-width="1"`;
+    switch (type) {
+      case "ont":
+        return `<path d="M0,-9 L8,0 L0,9 L-8,0 Z" ${ss}/>`;
+      case "router":
+        return `<rect x="-8" y="-4" width="16" height="8" rx="1" ${ss}/>
+                <line x1="-4" y1="-4" x2="-4" y2="-10" ${sl}/>
+                <line x1="4" y1="-4" x2="4" y2="-10" ${sl}/>
+                <circle cx="-4" cy="-11" r="1.5" ${sf}/>
+                <circle cx="4" cy="-11" r="1.5" ${sf}/>`;
+      case "switch":
+        return `<rect x="-10" y="-4" width="20" height="8" rx="1" ${ss}/>
+                <circle cx="-6" cy="0" r="1.5" ${sf}/>
+                <circle cx="-2" cy="0" r="1.5" ${sf}/>
+                <circle cx="2" cy="0" r="1.5" ${sf}/>
+                <circle cx="6" cy="0" r="1.5" ${sf}/>`;
+      case "ap":
+        return `<circle cx="0" cy="5" r="2" ${sf}/>
+                <path d="M-5,3 A6,6 0 0,1 5,3" ${sl}/>
+                <path d="M-9,-1 A10,10 0 0,1 9,-1" ${sl}/>`;
+      case "laptop":
+        return `<rect x="-8" y="-6" width="16" height="10" rx="1" ${ss}/>
+                <path d="M-10,5 L10,5 L7,8 L-7,8 Z" ${ss}/>`;
+      case "server":
+        return `<rect x="-7" y="-9" width="14" height="18" rx="1" ${ss}/>
+                <line x1="-4" y1="-4" x2="3" y2="-4" stroke="${sc}" stroke-width="0.8" opacity="0.5"/>
+                <line x1="-4" y1="0" x2="3" y2="0" stroke="${sc}" stroke-width="0.8" opacity="0.5"/>
+                <line x1="-4" y1="4" x2="3" y2="4" stroke="${sc}" stroke-width="0.8" opacity="0.5"/>
+                <circle cx="3" cy="-6" r="1.5" ${sf}/>`;
+      case "tv":
+        return `<rect x="-10" y="-7" width="20" height="13" rx="1" ${ss}/>
+                <line x1="0" y1="6" x2="0" y2="9" stroke="${sc}" stroke-width="1.2"/>
+                <line x1="-4" y1="9" x2="4" y2="9" stroke="${sc}" stroke-width="1.2"/>`;
+      case "splitter":
+        return `<line x1="0" y1="9" x2="0" y2="1" stroke="${sc}" stroke-width="1.5"/>
+                <line x1="0" y1="1" x2="-7" y2="-7" stroke="${sc}" stroke-width="1.5"/>
+                <line x1="0" y1="1" x2="7" y2="-7" stroke="${sc}" stroke-width="1.5"/>
+                <circle cx="0" cy="9" r="2.5" stroke="${sc}" fill="${fc}" stroke-width="1.2"/>`;
+      case "phone":
+        return `<rect x="-4" y="-8" width="8" height="16" rx="2" ${ss}/>
+                <circle cx="0" cy="5" r="1.2" ${sf}/>`;
+      default:
+        return `<circle cx="0" cy="0" r="8" ${ss}/>`;
+    }
+  }
+
+  function iconSVG(type, sc, fc, size) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-12 -12 24 24">${iconInnerStr(type, sc, fc)}</svg>`;
+  }
+
+  function cardPathHTML(ipSuffix, deviceName, status) {
+    const raw = DEVICE_PATHS[ipSuffix] || ["ont","router","unknown"];
+    const path = [...raw];
+    path[path.length - 1] = getDeviceType(deviceName);
+
+    const activeSc = status === "online"  ? "#00ff41"
+                   : status === "stale"   ? "#ffaa00"
+                   : status === "offline" ? "#ff4444" : "#334455";
+    const activeFc = status === "online"  ? "#001a00"
+                   : status === "offline" ? "#150000" : "#0a0a0a";
+
+    const nodes = path.map((type, i) => {
+      const isLast = i === path.length - 1;
+      const sc = isLast ? activeSc : "#1e3a1e";
+      const fc = isLast ? activeFc : "#04040a";
+      const lbl = PATH_LABELS[type] || "?";
+      return `<div class="path-node">
+        ${iconSVG(type, sc, fc, 18)}
+        <div class="path-label" style="color:${isLast ? activeSc : "#1e3e1e"}">${lbl}</div>
+      </div>`;
+    });
+
+    const parts = [];
+    nodes.forEach((n, i) => {
+      parts.push(n);
+      if (i < nodes.length - 1) parts.push(`<span class="path-arrow">›</span>`);
+    });
+
+    return `<div class="card-path">${parts.join("")}</div>`;
+  }
+
   function updateDashboard(data) {
     document.getElementById("bw-up").textContent = fmtBytes(data.bandwidth.upload_bps);
     document.getElementById("bw-down").textContent = fmtBytes(data.bandwidth.download_bps);
@@ -482,17 +624,31 @@
         else card.classList.add("flash-off");
       }
 
+      const suffix = device.ip.split(".").slice(2).join(".");
+      const devType = getDeviceType(device.name);
+      const sc = device.status === "online"  ? "#00ff41"
+               : device.status === "stale"   ? "#ffaa00"
+               : device.status === "offline" ? "#ff4444" : "#334455";
+      const fc = device.status === "online"  ? "#001a00"
+               : device.status === "offline" ? "#150000" : "#0a0a0a";
+
       card.className = `card ${device.status}`;
       card.innerHTML = `
-        <div class="card-status">
-          <div class="status-dot ${device.status}"></div>
-          <span class="status-label ${device.status}">${device.status}</span>
+        <div class="card-header">
+          <div class="card-icon">${iconSVG(devType, sc, fc, 28)}</div>
+          <div class="card-name-block">
+            <div class="card-name">${device.name}</div>
+            <div class="card-status-line">
+              <div class="status-dot ${device.status}"></div>
+              <span class="status-label ${device.status}">${device.status.toUpperCase()}</span>
+            </div>
+          </div>
         </div>
-        <div class="card-name">${device.name}</div>
-        <div class="card-detail">IP: <span>${device.ip}</span></div>
-        <div class="card-detail">MAC: <span>${device.mac}</span></div>
-        <div class="card-detail">Vendor: <span>${device.vendor}</span></div>
-        <div class="card-detail">Last seen: <span>${timeSince(device.last_seen)}</span></div>
+        ${cardPathHTML(suffix, device.name, device.status)}
+        <div class="card-detail">IP &nbsp;<span>${device.ip}</span></div>
+        <div class="card-detail">MAC <span>${device.mac}</span></div>
+        <div class="card-detail">VDR <span>${device.vendor}</span></div>
+        <div class="card-detail">AGO <span>${timeSince(device.last_seen)}</span></div>
       `;
 
       prevStatuses[device.ip] = device.status;
