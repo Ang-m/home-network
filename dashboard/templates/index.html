@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeNet Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid #1e1e1e;
+      border-radius: 8px;
+      padding: 14px 20px;
+      margin-bottom: 16px;
+      background: #111;
+    }
+    .header-title { font-size: 1.2rem; color: #00ff41; letter-spacing: 2px; }
+    .header-stats { display: flex; gap: 24px; font-size: 0.85rem; color: #aaa; }
+    .bw-up { color: #00ff41; }
+    .bw-down { color: #4af; }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      background: #00ff41; border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Topology map ── */
+    .topology {
+      border: 1px solid #1e1e1e;
+      border-radius: 8px;
+      background: #111;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .topology svg { display: block; margin: 0 auto; }
+    .topo-label { font-size: 11px; fill: #aaa; font-family: monospace; }
+    .topo-line { stroke: #333; stroke-width: 1.5; }
+    .topo-node { stroke-width: 2; }
+    .topo-node.online  { fill: #00ff41; stroke: #00ff41; filter: drop-shadow(0 0 4px #00ff41); }
+    .topo-node.offline { fill: #ff4444; stroke: #ff4444; }
+    .topo-node.stale   { fill: #ffaa00; stroke: #ffaa00; }
+    .topo-node.unknown { fill: #444; stroke: #666; }
+
+    /* ── Device count bar ── */
+    .device-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      color: #aaa;
+      letter-spacing: 1px;
+    }
+    .device-bar span.online-count { color: #00ff41; font-weight: bold; }
+    .device-bar span.offline-count { color: #ff4444; }
+
+    /* ── Device cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid #1e1e1e;
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #111;
+      transition: box-shadow 0.3s, border-color 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover { border-color: #333; }
+    .card.online  {
+      border-color: #00ff4122;
+      box-shadow: 0 0 12px #00ff4115;
+    }
+    .card.offline { border-color: #ff444422; opacity: 0.7; }
+    .card.stale   { border-color: #ffaa0022; }
+
+    .card.flash-on  { animation: flash-green 0.6s ease; }
+    .card.flash-off { animation: flash-red 0.6s ease; }
+    @keyframes flash-green {
+      0% { background: #00ff4133; }
+      100% { background: #111; }
+    }
+    @keyframes flash-red {
+      0% { background: #ff444433; }
+      100% { background: #111; }
+    }
+
+    .card-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .status-dot.online  { background: #00ff41; box-shadow: 0 0 6px #00ff41; }
+    .status-dot.offline { background: #ff4444; }
+    .status-dot.stale   { background: #ffaa00; }
+    .status-label { font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; }
+    .status-label.online  { color: #00ff41; }
+    .status-label.offline { color: #ff4444; }
+    .status-label.stale   { color: #ffaa00; }
+
+    .card-name { font-size: 0.95rem; color: #fff; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-detail { font-size: 0.75rem; color: #666; margin-bottom: 3px; }
+    .card-detail span { color: #aaa; }
+
+    .last-scan { text-align: right; margin-top: 16px; font-size: 0.7rem; color: #444; letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">&#127760; HomeNet Dashboard</div>
+    <div class="header-stats">
+      <span>&#8593; <span class="bw-up" id="bw-up">--</span></span>
+      <span>&#8595; <span class="bw-down" id="bw-down">--</span></span>
+      <span><span class="live-dot"></span>LIVE</span>
+    </div>
+  </div>
+
+  <!-- Topology map -->
+  <div class="topology">
+    <svg id="topo-svg" width="680" height="100" viewBox="0 0 680 100"></svg>
+  </div>
+
+  <!-- Device count -->
+  <div class="device-bar">
+    <span>DEVICES</span>
+    <span>
+      <span class="online-count" id="count-online">0</span> online &nbsp;&middot;&nbsp;
+      <span class="offline-count" id="count-offline">0</span> offline
+    </span>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards" id="cards"></div>
+
+  <div class="last-scan">Last scan: <span id="last-scan">--</span></div>
+
+<script>
+  const TOPO_NODES = [
+    { id: "ont",  label: "ONT",      x: 40,  y: 50 },
+    { id: "0.1",  label: "Router",   x: 150, y: 50 },
+    { id: "0.2",  label: "Work AP",  x: 280, y: 25 },
+    { id: "0.3",  label: "Sleep AP", x: 400, y: 25 },
+    { id: "0.10", label: "Server",   x: 280, y: 75 },
+    { id: "0.100",label: "Laptop",   x: 400, y: 75 },
+  ];
+  const TOPO_EDGES = [
+    ["ont","0.1"], ["0.1","0.2"], ["0.1","0.3"], ["0.1","0.10"], ["0.10","0.100"]
+  ];
+
+  let prevStatuses = {};
+
+  function fmtBytes(bps) {
+    if (bps >= 1048576) return (bps / 1048576).toFixed(1) + " MB/s";
+    if (bps >= 1024)    return (bps / 1024).toFixed(0) + " KB/s";
+    return bps + " B/s";
+  }
+
+  function timeSince(isoStr) {
+    if (!isoStr || isoStr === "never") return "never";
+    const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+    if (diff < 10) return "just now";
+    if (diff < 60) return diff + "s ago";
+    return Math.floor(diff / 60) + "m ago";
+  }
+
+  function buildTopo(devices) {
+    const svg = document.getElementById("topo-svg");
+    const statusMap = {};
+    devices.forEach(d => {
+      const suffix = d.ip.split(".").slice(2).join(".");
+      statusMap[suffix] = d.status;
+    });
+
+    svg.innerHTML = "";
+
+    TOPO_EDGES.forEach(([a, b]) => {
+      const na = TOPO_NODES.find(n => n.id === a);
+      const nb = TOPO_NODES.find(n => n.id === b);
+      if (!na || !nb) return;
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
+      line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
+      line.setAttribute("class", "topo-line");
+      svg.appendChild(line);
+    });
+
+    TOPO_NODES.forEach(node => {
+      const status = node.id === "ont" ? "online" : (statusMap[node.id] || "unknown");
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y);
+      circle.setAttribute("r", 7);
+      circle.setAttribute("class", `topo-node ${status}`);
+      g.appendChild(circle);
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", node.x); text.setAttribute("y", node.y + 20);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("class", "topo-label");
+      text.textContent = node.label;
+      g.appendChild(text);
+
+      svg.appendChild(g);
+    });
+  }
+
+  function updateDashboard(data) {
+    document.getElementById("bw-up").textContent = fmtBytes(data.bandwidth.upload_bps);
+    document.getElementById("bw-down").textContent = fmtBytes(data.bandwidth.download_bps);
+    document.getElementById("last-scan").textContent = new Date(data.scanned_at).toLocaleTimeString();
+
+    const online = data.devices.filter(d => d.status === "online").length;
+    const offline = data.devices.filter(d => d.status !== "online").length;
+    document.getElementById("count-online").textContent = online;
+    document.getElementById("count-offline").textContent = offline;
+
+    buildTopo(data.devices);
+
+    const container = document.getElementById("cards");
+    const existingCards = {};
+    container.querySelectorAll(".card[data-ip]").forEach(el => {
+      existingCards[el.dataset.ip] = el;
+    });
+
+    data.devices.forEach(device => {
+      const prev = prevStatuses[device.ip];
+      const card = existingCards[device.ip] || document.createElement("div");
+
+      if (!card.dataset.ip) {
+        card.dataset.ip = device.ip;
+        container.appendChild(card);
+      }
+
+      if (prev && prev !== device.status) {
+        card.classList.remove("flash-on", "flash-off");
+        void card.offsetWidth;
+        if (device.status === "online") card.classList.add("flash-on");
+        else card.classList.add("flash-off");
+      }
+
+      card.className = `card ${device.status}`;
+      card.innerHTML = `
+        <div class="card-status">
+          <div class="status-dot ${device.status}"></div>
+          <span class="status-label ${device.status}">${device.status}</span>
+        </div>
+        <div class="card-name">${device.name}</div>
+        <div class="card-detail">IP: <span>${device.ip}</span></div>
+        <div class="card-detail">MAC: <span>${device.mac}</span></div>
+        <div class="card-detail">Vendor: <span>${device.vendor}</span></div>
+        <div class="card-detail">Last seen: <span>${timeSince(device.last_seen)}</span></div>
+      `;
+
+      prevStatuses[device.ip] = device.status;
+    });
+  }
+
+  function poll() {
+    fetch("/api/scan")
+      .then(r => r.json())
+      .then(data => updateDashboard(data))
+      .catch(err => console.error("Scan failed:", err));
+  }
+
+  poll();
+  setInterval(poll, 5000);
+</script>
+</body>
+</html>
