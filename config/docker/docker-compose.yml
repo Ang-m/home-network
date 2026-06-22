@@ -180,3 +180,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
+
+  # ── HomeNet Dashboard ────────────────────────────────────────────
+  homenet-dashboard:
+    build: ../../dashboard
+    container_name: homenet-dashboard
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_RAW
+    environment:
+      - SCAN_INTERVAL=5
+      - NETWORK_PREFIX=192.168.0
+      - INTERFACE=eth0
