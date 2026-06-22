@@ -18,6 +18,8 @@ KNOWN_DEVICES = {
     f"{NETWORK_PREFIX}.2":   "Work Bedroom AP (RE305)",
     f"{NETWORK_PREFIX}.3":   "Sleep Bedroom AP (WA850RE)",
     f"{NETWORK_PREFIX}.10":  "Home Server",
+    f"{NETWORK_PREFIX}.100": "Angshu's Laptop (LAN)",
+    f"{NETWORK_PREFIX}.124": "Angshu's Laptop (WiFi)",
 }
 
 _last_seen: dict[str, str] = {}

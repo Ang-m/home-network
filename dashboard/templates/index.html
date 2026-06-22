@@ -148,7 +148,7 @@
 
   <!-- Topology map -->
   <div class="topology">
-    <svg id="topo-svg" width="680" height="100" viewBox="0 0 680 100"></svg>
+    <svg id="topo-svg" width="100%" height="255" viewBox="0 0 760 255" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
 
   <!-- Device count -->
@@ -166,16 +166,33 @@
   <div class="last-scan">Last scan: <span id="last-scan">--</span></div>
 
 <script>
+  // Network layout:
+  // ONT → Router → Hall TV (patch cable, main hall)
+  //             → Switch (TL-SG105E, work bedroom) → Work AP / Angshu Laptop / Server
+  //             → Splitter (EH210, sleep bedroom)  → Sleep AP / Sleep TV
+  // type:"infra" = always-on passive infrastructure (no IP to scan)
   const TOPO_NODES = [
-    { id: "ont",  label: "ONT",      x: 40,  y: 50 },
-    { id: "0.1",  label: "Router",   x: 150, y: 50 },
-    { id: "0.2",  label: "Work AP",  x: 280, y: 25 },
-    { id: "0.3",  label: "Sleep AP", x: 400, y: 25 },
-    { id: "0.10", label: "Server",   x: 280, y: 75 },
-    { id: "0.100",label: "Laptop",   x: 400, y: 75 },
+    { id: "ont",      label: "ONT",          x: 45,  y: 127, type: "infra"  },
+    { id: "0.1",      label: "Router",       x: 150, y: 127, type: "device" },
+    { id: "hall-tv",  label: "Hall TV",      x: 290, y: 45,  type: "device" },
+    { id: "switch",   label: "Switch",       x: 290, y: 127, type: "infra"  },
+    { id: "splitter", label: "Splitter",     x: 290, y: 210, type: "infra"  },
+    { id: "0.2",      label: "Work AP",      x: 450, y: 95,  type: "device" },
+    { id: "0.100",    label: "Laptop",       x: 450, y: 127, type: "device" },
+    { id: "0.10",     label: "Server",       x: 450, y: 158, type: "device" },
+    { id: "0.3",      label: "Sleep AP",     x: 450, y: 192, type: "device" },
+    { id: "sleep-tv", label: "Sleep TV",     x: 450, y: 223, type: "device" },
   ];
   const TOPO_EDGES = [
-    ["ont","0.1"], ["0.1","0.2"], ["0.1","0.3"], ["0.1","0.10"], ["0.10","0.100"]
+    ["ont","0.1"],
+    ["0.1","hall-tv"],
+    ["0.1","switch"],
+    ["0.1","splitter"],
+    ["switch","0.2"],
+    ["switch","0.100"],
+    ["switch","0.10"],
+    ["splitter","0.3"],
+    ["splitter","sleep-tv"],
   ];
 
   let prevStatuses = {};
@@ -216,7 +233,10 @@
     });
 
     TOPO_NODES.forEach(node => {
-      const status = node.id === "ont" ? "online" : (statusMap[node.id] || "unknown");
+      // Laptop can appear on wired (0.100) or WiFi (0.124) — show online if either is up
+      const status = node.type === "infra" ? "online"
+        : node.id === "0.100" ? (statusMap["0.100"] || statusMap["0.124"] || "unknown")
+        : (statusMap[node.id] || "unknown");
       const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
       const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
