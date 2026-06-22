@@ -8,6 +8,7 @@ from flask import Flask, jsonify, render_template
 from oui import get_vendor
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 NETWORK_PREFIX = os.environ.get("NETWORK_PREFIX", "192.168.0")
 INTERFACE = os.environ.get("INTERFACE", "eth0")

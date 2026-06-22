@@ -58,6 +58,8 @@
     .topo-node.offline { fill: #ff4444; stroke: #ff4444; }
     .topo-node.stale   { fill: #ffaa00; stroke: #ffaa00; }
     .topo-node.unknown { fill: #444; stroke: #666; }
+    .topo-wifi-line { stroke: #2a2a2a; stroke-width: 1; stroke-dasharray: 5 3; }
+    .topo-wifi-section { font-size: 9px; fill: #444; font-family: monospace; letter-spacing: 1.5px; }
 
     /* ── Device count bar ── */
     .device-bar {
@@ -148,7 +150,7 @@
 
   <!-- Topology map -->
   <div class="topology">
-    <svg id="topo-svg" width="100%" height="255" viewBox="0 0 760 255" preserveAspectRatio="xMidYMid meet"></svg>
+    <svg id="topo-svg" width="100%" height="255" viewBox="0 0 900 255" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
 
   <!-- Device count -->
@@ -178,7 +180,7 @@
     { id: "switch",   label: "Switch",       x: 290, y: 127, type: "infra"  },
     { id: "splitter", label: "Splitter",     x: 290, y: 210, type: "infra"  },
     { id: "0.2",      label: "Work AP",      x: 450, y: 95,  type: "device" },
-    { id: "0.100",    label: "Laptop",       x: 450, y: 127, type: "device" },
+    { id: "0.100",    label: "Laptop",       x: 450, y: 127, type: "device", aliases: ["0.124"] },
     { id: "0.10",     label: "Server",       x: 450, y: 158, type: "device" },
     { id: "0.3",      label: "Sleep AP",     x: 450, y: 192, type: "device" },
     { id: "sleep-tv", label: "Sleep TV",     x: 450, y: 223, type: "device" },
@@ -211,6 +213,8 @@
     return Math.floor(diff / 60) + "m ago";
   }
 
+  function mkEl(tag) { return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+
   function buildTopo(devices) {
     const svg = document.getElementById("topo-svg");
     const statusMap = {};
@@ -221,39 +225,135 @@
 
     svg.innerHTML = "";
 
+    // --- Static wired topology ---
+
+    // Edges first (drawn behind nodes)
     TOPO_EDGES.forEach(([a, b]) => {
       const na = TOPO_NODES.find(n => n.id === a);
       const nb = TOPO_NODES.find(n => n.id === b);
       if (!na || !nb) return;
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const line = mkEl("line");
       line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
       line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
       line.setAttribute("class", "topo-line");
       svg.appendChild(line);
     });
 
-    TOPO_NODES.forEach(node => {
-      // Laptop can appear on wired (0.100) or WiFi (0.124) — show online if either is up
-      const status = node.type === "infra" ? "online"
-        : node.id === "0.100" ? (statusMap["0.100"] || statusMap["0.124"] || "unknown")
-        : (statusMap[node.id] || "unknown");
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    // --- Dynamic wireless clients ---
+    // Build set of all IP suffixes already represented in static topology
+    const staticSuffixes = new Set();
+    TOPO_NODES.forEach(n => {
+      if (n.id.startsWith("0.")) staticSuffixes.add(n.id);
+      (n.aliases || []).forEach(a => staticSuffixes.add(a));
+    });
+    const wireless = devices.filter(d => {
+      const suffix = d.ip.split(".").slice(2).join(".");
+      return !staticSuffixes.has(suffix);
+    });
 
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    const HUB_X = 580, HUB_Y = 127;
+    const CLIENT_X = 710;
+    const MAX = 8;
+    const shown = wireless.slice(0, MAX);
+    const SPACING = 26;
+    const startY = HUB_Y - Math.floor(((shown.length - 1) * SPACING) / 2);
+
+    if (shown.length > 0) {
+      // Dashed backbone: Router → WiFi hub (drawn first, behind static nodes)
+      const router = TOPO_NODES.find(n => n.id === "0.1");
+      const backbone = mkEl("line");
+      backbone.setAttribute("x1", router.x); backbone.setAttribute("y1", router.y);
+      backbone.setAttribute("x2", HUB_X);    backbone.setAttribute("y2", HUB_Y);
+      backbone.setAttribute("class", "topo-wifi-line");
+      svg.appendChild(backbone);
+
+      // Dashed lines: hub → each client
+      shown.forEach((dev, i) => {
+        const cy = startY + i * SPACING;
+        const l = mkEl("line");
+        l.setAttribute("x1", HUB_X); l.setAttribute("y1", HUB_Y);
+        l.setAttribute("x2", CLIENT_X); l.setAttribute("y2", cy);
+        l.setAttribute("class", "topo-wifi-line");
+        svg.appendChild(l);
+      });
+    }
+
+    // Static nodes (drawn on top of all lines)
+    TOPO_NODES.forEach(node => {
+      const status = node.type === "infra" ? "online"
+        : node.id === "0.100"
+          ? (statusMap["0.100"] || statusMap["0.124"] || "unknown")
+          : (statusMap[node.id] || "unknown");
+
+      const circle = mkEl("circle");
       circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y);
       circle.setAttribute("r", 7);
       circle.setAttribute("class", `topo-node ${status}`);
-      g.appendChild(circle);
+      svg.appendChild(circle);
 
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      const text = mkEl("text");
       text.setAttribute("x", node.x); text.setAttribute("y", node.y + 20);
       text.setAttribute("text-anchor", "middle");
       text.setAttribute("class", "topo-label");
       text.textContent = node.label;
-      g.appendChild(text);
-
-      svg.appendChild(g);
+      svg.appendChild(text);
     });
+
+    // WiFi hub + client nodes (drawn last — on top)
+    if (shown.length > 0) {
+      // Section label
+      const sLabel = mkEl("text");
+      sLabel.setAttribute("x", CLIENT_X + 10); sLabel.setAttribute("y", startY - 12);
+      sLabel.setAttribute("text-anchor", "start");
+      sLabel.setAttribute("class", "topo-wifi-section");
+      sLabel.textContent = "WIRELESS";
+      svg.appendChild(sLabel);
+
+      // Hub circle + label
+      const hubCircle = mkEl("circle");
+      hubCircle.setAttribute("cx", HUB_X); hubCircle.setAttribute("cy", HUB_Y);
+      hubCircle.setAttribute("r", 6);
+      hubCircle.setAttribute("class", "topo-node online");
+      svg.appendChild(hubCircle);
+
+      const hubText = mkEl("text");
+      hubText.setAttribute("x", HUB_X); hubText.setAttribute("y", HUB_Y + 18);
+      hubText.setAttribute("text-anchor", "middle");
+      hubText.setAttribute("class", "topo-label");
+      hubText.textContent = "WiFi";
+      svg.appendChild(hubText);
+
+      // Client nodes + labels
+      shown.forEach((dev, i) => {
+        const cy = startY + i * SPACING;
+        const suffix = dev.ip.split(".").slice(2).join(".");
+        const lastOctet = suffix.split(".").pop();
+        const label = dev.name !== "Unknown Device" ? dev.name : `.${lastOctet}`;
+
+        const c = mkEl("circle");
+        c.setAttribute("cx", CLIENT_X); c.setAttribute("cy", cy);
+        c.setAttribute("r", 5);
+        c.setAttribute("class", `topo-node ${dev.status}`);
+        svg.appendChild(c);
+
+        const t = mkEl("text");
+        t.setAttribute("x", CLIENT_X + 10); t.setAttribute("y", cy + 4);
+        t.setAttribute("text-anchor", "start");
+        t.setAttribute("class", "topo-label");
+        t.textContent = label;
+        svg.appendChild(t);
+      });
+
+      if (wireless.length > MAX) {
+        const more = mkEl("text");
+        more.setAttribute("x", CLIENT_X + 10);
+        more.setAttribute("y", startY + shown.length * SPACING + 4);
+        more.setAttribute("text-anchor", "start");
+        more.setAttribute("class", "topo-label");
+        more.textContent = `+${wireless.length - MAX} more`;
+        svg.appendChild(more);
+      }
+    }
   }
 
   function updateDashboard(data) {
