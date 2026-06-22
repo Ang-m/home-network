@@ -1,0 +1,182 @@
+version: "3.8"
+
+# Home Server Docker Stack
+# Server: Used PC, Ubuntu 22.04, static IP 192.168.1.10
+# Storage: 2TB HDD mounted at /mnt/data
+#
+# Start all: docker compose up -d
+# Logs:      docker compose logs -f <service>
+# Update:    docker compose pull && docker compose up -d
+
+networks:
+  homelab:
+    driver: bridge
+
+volumes:
+  pihole_data:
+  pihole_dnsmasq:
+  jellyfin_config:
+  jellyfin_cache:
+  homeassistant_config:
+  syncthing_config:
+  portainer_data:
+  openwebui_data:
+
+services:
+
+  # ── Pi-hole (network-wide ad blocking) ──────────────────────────
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    network_mode: host          # must use host for DNS on port 53
+    environment:
+      TZ: "Asia/Kolkata"
+      WEBPASSWORD: "changeme"   # change this
+      DNSMASQ_LISTENING: "all"
+    volumes:
+      - pihole_data:/etc/pihole
+      - pihole_dnsmasq:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+
+  # ── WireGuard VPN (wg-easy) ─────────────────────────────────────
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:latest
+    container_name: wg-easy
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "51820:51820/udp"
+      - "51821:51821/tcp"
+    environment:
+      WG_HOST: ""               # fill in: your public IP or DuckDNS hostname
+      PASSWORD: "changeme"      # change this
+      WG_DEFAULT_DNS: "192.168.1.10"
+      WG_ALLOWED_IPS: "0.0.0.0/0"
+      TZ: "Asia/Kolkata"
+    volumes:
+      - /etc/wireguard:/etc/wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+
+  # ── Jellyfin (media server) ──────────────────────────────────────
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "8096:8096"
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - /mnt/data/media:/media:ro
+    environment:
+      TZ: "Asia/Kolkata"
+    devices:
+      - /dev/dri:/dev/dri       # hardware transcoding via iGPU
+
+  # ── Home Assistant ───────────────────────────────────────────────
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    network_mode: host          # needs host for mDNS/Alexa discovery
+    volumes:
+      - homeassistant_config:/config
+    environment:
+      TZ: "Asia/Kolkata"
+    privileged: true
+
+  # ── Samba (network file share / NAS) ────────────────────────────
+  samba:
+    image: dperson/samba:latest
+    container_name: samba
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /mnt/data:/mnt/data
+    command: >
+      -u "angshu;changeme"
+      -s "data;/mnt/data/shared;yes;no;no;angshu"
+      -s "media;/mnt/data/media;yes;no;no;angshu"
+    environment:
+      TZ: "Asia/Kolkata"
+
+  # ── Syncthing (auto-backup phones + laptops) ─────────────────────
+  syncthing:
+    image: syncthing/syncthing:latest
+    container_name: syncthing
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+    volumes:
+      - syncthing_config:/var/syncthing
+      - /mnt/data/backup:/mnt/data/backup
+    environment:
+      TZ: "Asia/Kolkata"
+      PUID: "1000"
+      PGID: "1000"
+
+  # ── Ollama (local LLMs) ──────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "11434:11434"
+    volumes:
+      - /mnt/data/docker/ollama:/root/.ollama
+    environment:
+      TZ: "Asia/Kolkata"
+    # Uncomment when GPU is added:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # ── Open-WebUI (browser UI for Ollama) ───────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "3000:8080"
+    volumes:
+      - openwebui_data:/app/backend/data
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      TZ: "Asia/Kolkata"
+    depends_on:
+      - ollama
+
+  # ── Portainer (Docker web UI) ────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
