@@ -45,10 +45,17 @@
     .topology {
       border: 1px solid #1e1e1e;
       border-radius: 8px;
-      background: #111;
+      background: #0a0a0a;
       padding: 16px 20px;
       margin-bottom: 16px;
       overflow-x: auto;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(0,255,65,0.012) 2px,
+        rgba(0,255,65,0.012) 4px
+      );
     }
     .topology svg { display: block; margin: 0 auto; }
     .topo-label { font-size: 11px; fill: #aaa; font-family: monospace; }
@@ -150,7 +157,23 @@
 
   <!-- Topology map -->
   <div class="topology">
-    <svg id="topo-svg" width="100%" height="255" viewBox="0 0 900 255" preserveAspectRatio="xMidYMid meet"></svg>
+    <svg id="topo-svg" width="100%" height="305" viewBox="0 0 960 305" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <filter id="glow-green" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-cyan" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,255,65,0.035)" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="960" height="305" fill="url(#grid)"/>
+      <g id="topo-content"></g>
+    </svg>
   </div>
 
   <!-- Device count -->
@@ -168,35 +191,35 @@
   <div class="last-scan">Last scan: <span id="last-scan">--</span></div>
 
 <script>
-  // Network layout:
-  // ONT → Router → Hall TV (patch cable, main hall)
-  //             → Switch (TL-SG105E .243, work bedroom) → Work AP / Angshu Laptop / Wife Laptop / Server
-  //             → Splitter (EH210, sleep bedroom)       → Sleep AP / Sleep TV
-  // type:"infra" = always-on passive infrastructure with no scannable IP
+  // ONT → Router → Hall TV (patch, main hall)
+  //             → Switch (TL-SG105E .243, work room) → Work AP / Angshu / Wife Laptop / Server
+  //             → Splitter (EH210, sleep room)       → Sleep AP / Sleep TV
+  // type:"infra" = always-on passive infrastructure (no scannable IP, rendered cyan)
+  // busX in TOPO_EDGES = x-coord of the vertical bus segment (orthogonal routing)
   const TOPO_NODES = [
-    { id: "ont",      label: "ONT",          x: 45,  y: 127, type: "infra"  },
-    { id: "0.1",      label: "Router",       x: 150, y: 127, type: "device" },
-    { id: "0.154",    label: "Hall TV",      x: 290, y: 45,  type: "device" },
-    { id: "0.243",    label: "Switch",       x: 290, y: 130, type: "device" },
-    { id: "splitter", label: "Splitter",     x: 290, y: 210, type: "infra"  },
-    { id: "0.2",      label: "Work AP",      x: 450, y: 85,  type: "device" },
-    { id: "0.100",    label: "Angshu",       x: 450, y: 115, type: "device", aliases: ["0.124", "0.129"] },
-    { id: "0.148",    label: "Wife Laptop",  x: 450, y: 145, type: "device" },
-    { id: "0.10",     label: "Server",       x: 450, y: 175, type: "device" },
-    { id: "0.3",      label: "Sleep AP",     x: 450, y: 197, type: "device" },
-    { id: "sleep-tv", label: "Sleep TV",     x: 450, y: 225, type: "device" },
+    { id:"ont",      label:"ONT",         x:60,  y:155, type:"infra",  icon:"ont"      },
+    { id:"0.1",      label:"Router",      x:185, y:155, type:"device", icon:"router"   },
+    { id:"0.154",    label:"Hall TV",     x:335, y:50,  type:"device", icon:"tv"       },
+    { id:"0.243",    label:"Switch",      x:335, y:155, type:"device", icon:"switch"   },
+    { id:"splitter", label:"Splitter",    x:335, y:262, type:"infra",  icon:"splitter" },
+    { id:"0.2",      label:"Work AP",     x:505, y:95,  type:"device", icon:"ap"       },
+    { id:"0.100",    label:"Angshu",      x:505, y:135, type:"device", icon:"laptop",  aliases:["0.124","0.129"] },
+    { id:"0.148",    label:"Wife Laptop", x:505, y:175, type:"device", icon:"laptop"   },
+    { id:"0.10",     label:"Server",      x:505, y:215, type:"device", icon:"server"   },
+    { id:"0.3",      label:"Sleep AP",    x:505, y:248, type:"device", icon:"ap"       },
+    { id:"sleep-tv", label:"Sleep TV",    x:505, y:278, type:"device", icon:"tv"       },
   ];
   const TOPO_EDGES = [
-    ["ont","0.1"],
-    ["0.1","0.154"],
-    ["0.1","0.243"],
-    ["0.1","splitter"],
-    ["0.243","0.2"],
-    ["0.243","0.100"],
-    ["0.243","0.148"],
-    ["0.243","0.10"],
-    ["splitter","0.3"],
-    ["splitter","sleep-tv"],
+    ["ont",     "0.1",      null],
+    ["0.1",     "0.154",    250],
+    ["0.1",     "0.243",    250],
+    ["0.1",     "splitter", 250],
+    ["0.243",   "0.2",      415],
+    ["0.243",   "0.100",    415],
+    ["0.243",   "0.148",    415],
+    ["0.243",   "0.10",     415],
+    ["splitter","0.3",      415],
+    ["splitter","sleep-tv", 415],
   ];
 
   let prevStatuses = {};
@@ -215,145 +238,212 @@
     return Math.floor(diff / 60) + "m ago";
   }
 
-  function mkEl(tag) { return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+  // ── SVG helpers ──────────────────────────────────────────────────────────
+  function mkSvg(tag) { return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+  function svgPath(d, style) {
+    const p = mkSvg("path"); p.setAttribute("d", d); p.setAttribute("style", style); return p;
+  }
+  function svgLine(x1, y1, x2, y2, style) {
+    const l = mkSvg("line");
+    l.setAttribute("x1",x1); l.setAttribute("y1",y1);
+    l.setAttribute("x2",x2); l.setAttribute("y2",y2);
+    l.setAttribute("style", style); return l;
+  }
+  function svgRect(x, y, w, h, rx, style) {
+    const r = mkSvg("rect");
+    r.setAttribute("x",x); r.setAttribute("y",y);
+    r.setAttribute("width",w); r.setAttribute("height",h);
+    if (rx) r.setAttribute("rx",rx);
+    r.setAttribute("style", style); return r;
+  }
+  function svgCircle(cx, cy, r, style) {
+    const c = mkSvg("circle");
+    c.setAttribute("cx",cx); c.setAttribute("cy",cy); c.setAttribute("r",r);
+    c.setAttribute("style", style); return c;
+  }
+  function svgText(x, y, txt, anchor, style) {
+    const t = mkSvg("text");
+    t.setAttribute("x",x); t.setAttribute("y",y);
+    t.setAttribute("text-anchor", anchor || "middle");
+    t.setAttribute("style", style);
+    t.textContent = txt; return t;
+  }
 
+  // ── Color palette per status ──────────────────────────────────────────────
+  function statusPalette(status) {
+    if (status === "infra")   return { s:"#33ccff", f:"#00111a" };
+    if (status === "online")  return { s:"#00ff41", f:"#001a00" };
+    if (status === "stale")   return { s:"#ffaa00", f:"#181000" };
+    return { s:"#334455", f:"#0d0d0d" };
+  }
+
+  // ── Per-device icon shapes (centered at cx, cy) ───────────────────────────
+  function drawIcon(parent, icon, cx, cy, col, flt) {
+    const g = mkSvg("g");
+    if (flt) g.setAttribute("filter", flt);
+    const ss  = `stroke:${col.s};fill:${col.f};stroke-width:1.2;stroke-linecap:round;`;
+    const sl  = `stroke:${col.s};fill:none;stroke-width:1.2;stroke-linecap:round;`;
+    const sf  = `stroke:${col.s};fill:${col.s};stroke-width:1;`;
+
+    switch (icon) {
+      case "ont":
+        g.appendChild(svgPath(`M${cx},${cy-9} L${cx+8},${cy} L${cx},${cy+9} L${cx-8},${cy} Z`, ss));
+        break;
+      case "router":
+        g.appendChild(svgRect(cx-8, cy-4, 16, 8, 1, ss));
+        g.appendChild(svgLine(cx-4, cy-4, cx-4, cy-10, `stroke:${col.s};stroke-width:1.2;`));
+        g.appendChild(svgLine(cx+4, cy-4, cx+4, cy-10, `stroke:${col.s};stroke-width:1.2;`));
+        g.appendChild(svgCircle(cx-4, cy-11, 1.5, sf));
+        g.appendChild(svgCircle(cx+4, cy-11, 1.5, sf));
+        break;
+      case "switch":
+        g.appendChild(svgRect(cx-10, cy-4, 20, 8, 1, ss));
+        [-6,-2,2,6].forEach(dx => g.appendChild(svgCircle(cx+dx, cy, 1.5, sf)));
+        break;
+      case "ap":
+        g.appendChild(svgCircle(cx, cy+5, 2, sf));
+        g.appendChild(svgPath(`M${cx-5},${cy+3} A6,6 0 0,1 ${cx+5},${cy+3}`, sl));
+        g.appendChild(svgPath(`M${cx-9},${cy-1} A10,10 0 0,1 ${cx+9},${cy-1}`, sl));
+        break;
+      case "laptop":
+        g.appendChild(svgRect(cx-8, cy-6, 16, 10, 1, ss));
+        g.appendChild(svgPath(`M${cx-10},${cy+5} L${cx+10},${cy+5} L${cx+7},${cy+8} L${cx-7},${cy+8} Z`, ss));
+        break;
+      case "server":
+        g.appendChild(svgRect(cx-7, cy-9, 14, 18, 1, ss));
+        [-4,0,4].forEach(dy => g.appendChild(svgLine(cx-4, cy+dy, cx+3, cy+dy, `stroke:${col.s};stroke-width:0.8;opacity:0.5;`)));
+        g.appendChild(svgCircle(cx+3, cy-6, 1.5, sf));
+        break;
+      case "tv":
+        g.appendChild(svgRect(cx-10, cy-7, 20, 13, 1, ss));
+        g.appendChild(svgLine(cx, cy+6, cx, cy+9, `stroke:${col.s};stroke-width:1.2;`));
+        g.appendChild(svgLine(cx-4, cy+9, cx+4, cy+9, `stroke:${col.s};stroke-width:1.2;`));
+        break;
+      case "splitter":
+        g.appendChild(svgLine(cx, cy+9, cx, cy+1, `stroke:${col.s};stroke-width:1.5;`));
+        g.appendChild(svgLine(cx, cy+1, cx-7, cy-7, `stroke:${col.s};stroke-width:1.5;`));
+        g.appendChild(svgLine(cx, cy+1, cx+7, cy-7, `stroke:${col.s};stroke-width:1.5;`));
+        g.appendChild(svgCircle(cx, cy+9, 2.5, `stroke:${col.s};fill:${col.f};stroke-width:1.2;`));
+        break;
+      case "phone":
+        g.appendChild(svgRect(cx-4, cy-8, 8, 16, 2, ss));
+        g.appendChild(svgCircle(cx, cy+5, 1.2, sf));
+        break;
+      case "wifi":
+        g.appendChild(svgCircle(cx, cy, 9, `stroke:${col.s};fill:${col.f};stroke-width:1.2;`));
+        g.appendChild(svgCircle(cx, cy+3, 2, sf));
+        g.appendChild(svgPath(`M${cx-4},${cy+1} A5,5 0 0,1 ${cx+4},${cy+1}`, sl));
+        g.appendChild(svgPath(`M${cx-7},${cy-2} A8,8 0 0,1 ${cx+7},${cy-2}`, sl));
+        break;
+      default:
+        g.appendChild(svgCircle(cx, cy, 8, ss));
+    }
+    parent.appendChild(g);
+  }
+
+  // ── Main topology builder ─────────────────────────────────────────────────
   function buildTopo(devices) {
-    const svg = document.getElementById("topo-svg");
+    const content = document.getElementById("topo-content");
+    content.innerHTML = "";
+
     const statusMap = {};
     devices.forEach(d => {
-      const suffix = d.ip.split(".").slice(2).join(".");
-      statusMap[suffix] = d.status;
+      statusMap[d.ip.split(".").slice(2).join(".")] = d.status;
     });
 
-    svg.innerHTML = "";
-
-    // --- Static wired topology ---
-
-    // Edges first (drawn behind nodes)
-    TOPO_EDGES.forEach(([a, b]) => {
-      const na = TOPO_NODES.find(n => n.id === a);
-      const nb = TOPO_NODES.find(n => n.id === b);
-      if (!na || !nb) return;
-      const line = mkEl("line");
-      line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
-      line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
-      line.setAttribute("class", "topo-line");
-      svg.appendChild(line);
-    });
-
-    // --- Dynamic wireless clients ---
-    // Build set of all IP suffixes already represented in static topology
     const staticSuffixes = new Set();
     TOPO_NODES.forEach(n => {
       if (n.id.startsWith("0.")) staticSuffixes.add(n.id);
       (n.aliases || []).forEach(a => staticSuffixes.add(a));
     });
-    const wireless = devices.filter(d => {
-      const suffix = d.ip.split(".").slice(2).join(".");
-      return !staticSuffixes.has(suffix);
-    });
+    const wireless = devices.filter(d =>
+      !staticSuffixes.has(d.ip.split(".").slice(2).join("."))
+    );
 
-    const HUB_X = 580, HUB_Y = 127;
-    const CLIENT_X = 710;
-    const MAX = 8;
-    const shown = wireless.slice(0, MAX);
-    const SPACING = 26;
-    const startY = HUB_Y - Math.floor(((shown.length - 1) * SPACING) / 2);
+    const WIRE = "stroke:#1a3a1a;fill:none;stroke-width:1.5;";
+    const WIFI = "stroke:#0a3040;fill:none;stroke-width:1;stroke-dasharray:6,3;";
 
-    if (shown.length > 0) {
-      // Dashed backbone: Router → WiFi hub (drawn first, behind static nodes)
-      const router = TOPO_NODES.find(n => n.id === "0.1");
-      const backbone = mkEl("line");
-      backbone.setAttribute("x1", router.x); backbone.setAttribute("y1", router.y);
-      backbone.setAttribute("x2", HUB_X);    backbone.setAttribute("y2", HUB_Y);
-      backbone.setAttribute("class", "topo-wifi-line");
-      svg.appendChild(backbone);
+    const nodeMap = {};
+    TOPO_NODES.forEach(n => nodeMap[n.id] = n);
 
-      // Dashed lines: hub → each client
-      shown.forEach((dev, i) => {
-        const cy = startY + i * SPACING;
-        const l = mkEl("line");
-        l.setAttribute("x1", HUB_X); l.setAttribute("y1", HUB_Y);
-        l.setAttribute("x2", CLIENT_X); l.setAttribute("y2", cy);
-        l.setAttribute("class", "topo-wifi-line");
-        svg.appendChild(l);
-      });
+    // WiFi backbone (drawn first, sits behind wired topology)
+    if (wireless.length > 0) {
+      const r = nodeMap["0.1"];
+      content.appendChild(svgLine(r.x, r.y, 670, r.y, WIFI));
     }
 
-    // Static nodes (drawn on top of all lines)
+    // Wired edges — orthogonal routing via busX
+    TOPO_EDGES.forEach(([aId, bId, busX]) => {
+      const na = nodeMap[aId], nb = nodeMap[bId];
+      if (!na || !nb) return;
+      const d = busX
+        ? `M${na.x},${na.y} L${busX},${na.y} L${busX},${nb.y} L${nb.x},${nb.y}`
+        : `M${na.x},${na.y} L${nb.x},${nb.y}`;
+      content.appendChild(svgPath(d, WIRE));
+    });
+
+    // Static wired nodes + labels
     TOPO_NODES.forEach(node => {
-      const status = node.type === "infra" ? "online"
+      const rawStatus = node.type === "infra" ? "infra"
         : node.id === "0.100"
           ? (statusMap["0.100"] || statusMap["0.124"] || statusMap["0.129"] || "unknown")
           : (statusMap[node.id] || "unknown");
+      const col = statusPalette(rawStatus);
+      const flt = rawStatus === "online" ? "url(#glow-green)"
+                : rawStatus === "infra"  ? "url(#glow-cyan)" : "";
 
-      const circle = mkEl("circle");
-      circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y);
-      circle.setAttribute("r", 7);
-      circle.setAttribute("class", `topo-node ${status}`);
-      svg.appendChild(circle);
+      drawIcon(content, node.icon, node.x, node.y, col, flt);
 
-      const text = mkEl("text");
-      text.setAttribute("x", node.x); text.setAttribute("y", node.y + 20);
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("class", "topo-label");
-      text.textContent = node.label;
-      svg.appendChild(text);
+      const isLeaf = node.x >= 450;
+      if (isLeaf) {
+        content.appendChild(svgText(node.x + 16, node.y + 4, node.label, "start",
+          `font-size:10px;fill:${col.s};font-family:monospace;letter-spacing:0.5px;`));
+      } else {
+        content.appendChild(svgText(node.x, node.y + 22, node.label, "middle",
+          `font-size:10px;fill:${col.s};font-family:monospace;letter-spacing:0.5px;`));
+      }
     });
 
-    // WiFi hub + client nodes (drawn last — on top)
-    if (shown.length > 0) {
-      // Section label
-      const sLabel = mkEl("text");
-      sLabel.setAttribute("x", CLIENT_X + 10); sLabel.setAttribute("y", startY - 12);
-      sLabel.setAttribute("text-anchor", "start");
-      sLabel.setAttribute("class", "topo-wifi-section");
-      sLabel.textContent = "WIRELESS";
-      svg.appendChild(sLabel);
+    // Wireless section
+    if (wireless.length > 0) {
+      const HUB_X = 670, HUB_Y = 155;
+      const CLIENT_X = 810, BUS_X = 740;
+      const SPACING = 32, MAX_W = 8;
+      const shown = wireless.slice(0, MAX_W);
+      const startY = HUB_Y - Math.floor(((shown.length - 1) * SPACING) / 2);
 
-      // Hub circle + label
-      const hubCircle = mkEl("circle");
-      hubCircle.setAttribute("cx", HUB_X); hubCircle.setAttribute("cy", HUB_Y);
-      hubCircle.setAttribute("r", 6);
-      hubCircle.setAttribute("class", "topo-node online");
-      svg.appendChild(hubCircle);
+      const hubCol = statusPalette(shown.some(d => d.status === "online") ? "online" : "unknown");
+      const hubFlt = hubCol.s === "#00ff41" ? "url(#glow-green)" : "";
+      drawIcon(content, "wifi", HUB_X, HUB_Y, hubCol, hubFlt);
+      content.appendChild(svgText(HUB_X, HUB_Y + 23, "WIFI", "middle",
+        `font-size:9px;fill:${hubCol.s};font-family:monospace;letter-spacing:1.5px;`));
 
-      const hubText = mkEl("text");
-      hubText.setAttribute("x", HUB_X); hubText.setAttribute("y", HUB_Y + 18);
-      hubText.setAttribute("text-anchor", "middle");
-      hubText.setAttribute("class", "topo-label");
-      hubText.textContent = "WiFi";
-      svg.appendChild(hubText);
+      content.appendChild(svgText(CLIENT_X - 2, startY - 16, "[ WIRELESS ]", "end",
+        "font-size:9px;fill:#2a8888;font-family:monospace;letter-spacing:1.5px;"));
 
-      // Client nodes + labels
+      content.appendChild(svgLine(HUB_X + 9, HUB_Y, BUS_X, HUB_Y, WIFI));
+      if (shown.length > 1)
+        content.appendChild(svgLine(BUS_X, startY, BUS_X, startY + (shown.length-1)*SPACING, WIFI));
+
       shown.forEach((dev, i) => {
         const cy = startY + i * SPACING;
-        const suffix = dev.ip.split(".").slice(2).join(".");
-        const lastOctet = suffix.split(".").pop();
-        const label = dev.name !== "Unknown Device" ? dev.name : `.${lastOctet}`;
-
-        const c = mkEl("circle");
-        c.setAttribute("cx", CLIENT_X); c.setAttribute("cy", cy);
-        c.setAttribute("r", 5);
-        c.setAttribute("class", `topo-node ${dev.status}`);
-        svg.appendChild(c);
-
-        const t = mkEl("text");
-        t.setAttribute("x", CLIENT_X + 10); t.setAttribute("y", cy + 4);
-        t.setAttribute("text-anchor", "start");
-        t.setAttribute("class", "topo-label");
-        t.textContent = label;
-        svg.appendChild(t);
+        const col = statusPalette(dev.status);
+        const flt = dev.status === "online" ? "url(#glow-green)" : "";
+        content.appendChild(svgLine(BUS_X, cy, CLIENT_X, cy, WIFI));
+        drawIcon(content, "phone", CLIENT_X, cy, col, flt);
+        const rawLabel = dev.name !== "Unknown Device"
+          ? dev.name.replace(/\s*\(.*?\)$/g, "")
+          : `.${dev.ip.split(".").pop()}`;
+        const label = rawLabel.length > 18 ? rawLabel.substring(0, 17) + "…" : rawLabel;
+        content.appendChild(svgText(CLIENT_X + 14, cy + 4, label, "start",
+          `font-size:9px;fill:${col.s};font-family:monospace;`));
       });
 
-      if (wireless.length > MAX) {
-        const more = mkEl("text");
-        more.setAttribute("x", CLIENT_X + 10);
-        more.setAttribute("y", startY + shown.length * SPACING + 4);
-        more.setAttribute("text-anchor", "start");
-        more.setAttribute("class", "topo-label");
-        more.textContent = `+${wireless.length - MAX} more`;
-        svg.appendChild(more);
+      if (wireless.length > MAX_W) {
+        content.appendChild(svgText(CLIENT_X + 14,
+          startY + shown.length * SPACING + 4,
+          `+${wireless.length - MAX_W} more`, "start",
+          "font-size:9px;fill:#445;font-family:monospace;"));
       }
     }
   }
