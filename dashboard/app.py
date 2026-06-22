@@ -20,7 +20,12 @@ KNOWN_DEVICES = {
     f"{NETWORK_PREFIX}.3":   "Sleep Bedroom AP (WA850RE)",
     f"{NETWORK_PREFIX}.10":  "Home Server",
     f"{NETWORK_PREFIX}.100": "Angshu's Laptop (LAN)",
-    f"{NETWORK_PREFIX}.124": "Angshu's Laptop (WiFi)",
+    f"{NETWORK_PREFIX}.124": "Angshu's Laptop (LAN)",
+    f"{NETWORK_PREFIX}.129": "Angshu's Laptop (WiFi)",
+    f"{NETWORK_PREFIX}.121": "Angshu's iPhone 16",
+    f"{NETWORK_PREFIX}.148": "Wife's Work Laptop",
+    f"{NETWORK_PREFIX}.209": "Wife's Motorola Edge 16 Fusion",
+    f"{NETWORK_PREFIX}.243": "Switch (TL-SG105E)",
 }
 
 _last_seen: dict[str, str] = {}

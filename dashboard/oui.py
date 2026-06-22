@@ -26,6 +26,9 @@ _OUI_TABLE = {
     "00:E0:4C": "Realtek",
     "00:1B:21": "Intel",
     "00:23:14": "Intel",
+    "C0:A8:10": "Intel",
+    "A0:59:50": "Intel",
+    "58:04:4F": "TP-Link",
 }
 
 

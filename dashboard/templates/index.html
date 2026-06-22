@@ -170,29 +170,31 @@
 <script>
   // Network layout:
   // ONT → Router → Hall TV (patch cable, main hall)
-  //             → Switch (TL-SG105E, work bedroom) → Work AP / Angshu Laptop / Server
-  //             → Splitter (EH210, sleep bedroom)  → Sleep AP / Sleep TV
-  // type:"infra" = always-on passive infrastructure (no IP to scan)
+  //             → Switch (TL-SG105E .243, work bedroom) → Work AP / Angshu Laptop / Wife Laptop / Server
+  //             → Splitter (EH210, sleep bedroom)       → Sleep AP / Sleep TV
+  // type:"infra" = always-on passive infrastructure with no scannable IP
   const TOPO_NODES = [
     { id: "ont",      label: "ONT",          x: 45,  y: 127, type: "infra"  },
     { id: "0.1",      label: "Router",       x: 150, y: 127, type: "device" },
     { id: "hall-tv",  label: "Hall TV",      x: 290, y: 45,  type: "device" },
-    { id: "switch",   label: "Switch",       x: 290, y: 127, type: "infra"  },
+    { id: "0.243",    label: "Switch",       x: 290, y: 130, type: "device" },
     { id: "splitter", label: "Splitter",     x: 290, y: 210, type: "infra"  },
-    { id: "0.2",      label: "Work AP",      x: 450, y: 95,  type: "device" },
-    { id: "0.100",    label: "Laptop",       x: 450, y: 127, type: "device", aliases: ["0.124"] },
-    { id: "0.10",     label: "Server",       x: 450, y: 158, type: "device" },
-    { id: "0.3",      label: "Sleep AP",     x: 450, y: 192, type: "device" },
-    { id: "sleep-tv", label: "Sleep TV",     x: 450, y: 223, type: "device" },
+    { id: "0.2",      label: "Work AP",      x: 450, y: 85,  type: "device" },
+    { id: "0.100",    label: "Angshu",       x: 450, y: 115, type: "device", aliases: ["0.124", "0.129"] },
+    { id: "0.148",    label: "Wife Laptop",  x: 450, y: 145, type: "device" },
+    { id: "0.10",     label: "Server",       x: 450, y: 175, type: "device" },
+    { id: "0.3",      label: "Sleep AP",     x: 450, y: 197, type: "device" },
+    { id: "sleep-tv", label: "Sleep TV",     x: 450, y: 225, type: "device" },
   ];
   const TOPO_EDGES = [
     ["ont","0.1"],
     ["0.1","hall-tv"],
-    ["0.1","switch"],
+    ["0.1","0.243"],
     ["0.1","splitter"],
-    ["switch","0.2"],
-    ["switch","0.100"],
-    ["switch","0.10"],
+    ["0.243","0.2"],
+    ["0.243","0.100"],
+    ["0.243","0.148"],
+    ["0.243","0.10"],
     ["splitter","0.3"],
     ["splitter","sleep-tv"],
   ];
@@ -282,7 +284,7 @@
     TOPO_NODES.forEach(node => {
       const status = node.type === "infra" ? "online"
         : node.id === "0.100"
-          ? (statusMap["0.100"] || statusMap["0.124"] || "unknown")
+          ? (statusMap["0.100"] || statusMap["0.124"] || statusMap["0.129"] || "unknown")
           : (statusMap[node.id] || "unknown");
 
       const circle = mkEl("circle");
